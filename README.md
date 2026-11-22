@@ -71,7 +71,7 @@ To remove the app itself:
 3. Quit the app.
 4. Delete **Fast Time Machine Backup** from Applications.
 
-Backups already stored by Time Machine stay. Time Machine Settings is not changed. The log file `/var/log/local.fasttimemachine.backup.log` is left on the Mac.
+Backups already stored by Time Machine stay. Time Machine Settings is not changed. The log file `/var/log/local.fasttimemachine.backup.log` is left on the Mac. The exclusion list `~/Library/Application Support/local.fasttimemachine.backup/exclusions.txt` is left on the Mac.
 
 ## License
 
