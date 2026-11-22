@@ -1,0 +1,269 @@
+#!/bin/bash
+# Hourly Time Machine run aimed at a fast SMB copy to the DS220+.
+# Automatic backups stay off in System Settings. This daemon is the scheduler.
+
+LOCKDIR=/var/run/com.vankov.tmbackup.lock
+NSMB=/etc/nsmb.conf
+NSMB_BAK=/etc/nsmb.conf.tmbackup-saved
+LOG=/var/log/com.vankov.tmbackup.log
+EXCLUSIONS_FILE="$(cd "$(dirname "$0")/.." && pwd)/Resources/exclusions.txt"
+tweaks_on=0
+had_nsmb=0
+exclusions_on=0
+
+log() {
+    printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >>"$LOG"
+}
+
+unmount_tm() {
+    local p
+    shopt -s nullglob
+    for p in /Volumes/.timemachine/DS220plus/*/*/* /Volumes/Backups\ von\ * /Volumes/Backups*; do
+        [ -e "$p" ] || continue
+        /usr/sbin/diskutil unmount force "$p" >/dev/null 2>&1 || true
+        /usr/sbin/diskutil unmountDisk force "$p" >/dev/null 2>&1 || true
+    done
+    shopt -u nullglob
+}
+
+PLIST=/Library/Preferences/com.apple.TimeMachine.plist
+saved_paths=()
+
+read_settings() {
+    saved_paths=()
+    local line
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        saved_paths+=("$line")
+    done < <(/usr/libexec/PlistBuddy -c 'Print :SkipPaths' "$PLIST" 2>/dev/null | /usr/bin/sed -n 's/^    //p')
+}
+
+refresh_prefs() {
+    # SIGKILL, so cfprefsd cannot write its old cache back over the file.
+    /bin/launchctl kickstart -k system/com.apple.cfprefsd.xpc.daemon >/dev/null 2>&1 || true
+    /bin/launchctl kickstart -k system/com.apple.cfprefsd.daemon >/dev/null 2>&1 || true
+    local uid
+    uid=$(/usr/bin/stat -f %u /dev/console 2>/dev/null || true)
+    if [ -n "$uid" ] && [ "$uid" != "0" ]; then
+        /bin/launchctl kickstart -k "gui/${uid}/com.apple.cfprefsd.agent" >/dev/null 2>&1 || true
+    fi
+}
+
+write_settings() {
+    local list err
+    list=$(mktemp)
+    err=$(mktemp)
+    if [ "$#" -gt 0 ]; then
+        printf '%s\n' "$@" >"$list"
+    fi
+    if ! PLIST_PATH="$PLIST" PATHS_FILE="$list" /usr/bin/python3 - "$err" <<'PY'
+import os, plistlib, shutil, subprocess, sys
+plist_path = os.environ["PLIST_PATH"]
+paths_file = os.environ["PATHS_FILE"]
+err_path = sys.argv[1]
+try:
+    with open(plist_path, "rb") as handle:
+        data = plistlib.load(handle)
+    paths = []
+    with open(paths_file, "r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.rstrip("\n")
+            if line:
+                paths.append(line)
+    data["SkipPaths"] = paths
+    tmp = "/tmp/com.vankov.tmbackup.settings.plist"
+    with open(tmp, "wb") as handle:
+        plistlib.dump(data, handle, fmt=plistlib.FMT_BINARY)
+    os.chmod(tmp, 0o644)
+    imported = subprocess.run(
+        ["/usr/bin/defaults", "import", plist_path, tmp],
+        capture_output=True, text=True,
+    )
+    if imported.returncode != 0:
+        detail = (imported.stderr or imported.stdout).strip()
+        aside = plist_path + ".tmbackup-old"
+        os.replace(plist_path, aside)
+        shutil.copyfile(tmp, plist_path)
+        os.chmod(plist_path, 0o644)
+        subprocess.run(["/usr/sbin/chown", "root:wheel", plist_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            os.unlink(aside)
+        except OSError:
+            pass
+        if detail:
+            sys.stderr.write(detail + "\n")
+except Exception as exc:
+    with open(err_path, "w", encoding="utf-8") as handle:
+        handle.write(str(exc))
+    sys.exit(1)
+PY
+    then
+        log "could not write Time Machine settings: $(tr '\n' ' ' <"$err")"
+        rm -f "$list" "$err"
+        return 1
+    fi
+    rm -f "$list" "$err"
+    refresh_prefs
+}
+
+MARKS=/var/run/com.vankov.tmbackup.marks
+marks_on=0
+EXCLUDE_ATTR='com.apple.metadata:com_apple_backup_excludeItem'
+
+unmark_exclusions() {
+    if [ "$marks_on" -ne 1 ] || [ ! -f "$MARKS" ]; then
+        return 0
+    fi
+    local removed
+    removed=$(MARKS_FILE="$MARKS" ATTR="$EXCLUDE_ATTR" /usr/bin/python3 - <<'PY'
+import ctypes, os
+libc = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True)
+attr = os.environ["ATTR"].encode()
+removed = 0
+with open(os.environ["MARKS_FILE"], encoding="utf-8") as handle:
+    paths = [line.rstrip("\n") for line in handle if line.strip()]
+for path in paths:
+    if libc.removexattr(path.encode(), attr, 1) == 0:
+        removed += 1
+print(removed)
+PY
+)
+    log "removed $removed exclusion marks"
+    rm -f "$MARKS"
+    marks_on=0
+}
+
+restore() {
+    unmark_exclusions
+    if [ "$exclusions_on" -eq 1 ]; then
+        write_settings "${saved_paths[@]}"
+        exclusions_on=0
+    fi
+    if [ "$tweaks_on" -eq 1 ]; then
+        /usr/sbin/sysctl debug.lowpri_throttle_enabled=1 >/dev/null 2>&1 || true
+        /sbin/ifconfig awdl0 up >/dev/null 2>&1 || true
+        if [ "$had_nsmb" -eq 1 ]; then
+            mv -f "$NSMB_BAK" "$NSMB"
+        else
+            rm -f "$NSMB"
+        fi
+        tweaks_on=0
+    fi
+    rm -rf "$LOCKDIR"
+}
+
+if [ "$(id -u)" -ne 0 ]; then
+    exec "$(cd "$(dirname "$0")" && pwd)/BackupMenu"
+fi
+
+if ! mkdir "$LOCKDIR" 2>/dev/null; then
+    old=$(cat "$LOCKDIR/pid" 2>/dev/null || true)
+    if [ -n "$old" ] && kill -0 "$old" 2>/dev/null; then
+        log "already running (pid $old), skip"
+        exit 0
+    fi
+    rm -rf "$LOCKDIR"
+    mkdir "$LOCKDIR" 2>/dev/null || exit 0
+fi
+echo $$ >"$LOCKDIR/pid"
+trap restore EXIT
+log "invoked pid $$"
+
+nas_up=0
+for _ in $(seq 1 40); do
+    if ping -c 1 -t 1 DS220plus >/dev/null 2>&1 || ping -c 1 -t 1 10.0.0.5 >/dev/null 2>&1; then
+        nas_up=1
+        break
+    fi
+    sleep 2
+done
+if [ "$nas_up" -eq 0 ]; then
+    log "NAS not reachable, skip"
+    exit 0
+fi
+
+# Wi-Fi radio is shared with AirDrop. Drop it for the copy.
+/sbin/ifconfig awdl0 down
+# Time Machine reads the disk at low priority. Lift that for this run.
+/usr/sbin/sysctl debug.lowpri_throttle_enabled=0 >/dev/null
+
+if [ -f "$NSMB" ]; then
+    cp -p "$NSMB" "$NSMB_BAK"
+    had_nsmb=1
+fi
+# /bin/sh echo -e does not expand escapes, so the old file was ignored and
+# SMB signing stayed on. printf writes a real config. A new mount is required
+# before the client honors it, so any existing Time Machine volume is dropped.
+cat >"$NSMB" <<'EOF'
+[default]
+signing_required=no
+notify_off=yes
+protocol_vers_map=4
+EOF
+tweaks_on=1
+log "optimizations on (AirDrop radio down, low priority off, SMB signing off)"
+unmount_tm
+
+# Time Machine Settings stays as it is. Extra paths are marked on the folders
+# themselves for this run, then the marks are removed when the backup exits.
+EXCLUSIONS=()
+if [ -f "$EXCLUSIONS_FILE" ]; then
+    while IFS= read -r p || [ -n "$p" ]; do
+        case "$p" in
+            ''|\#*) continue ;;
+        esac
+        EXCLUSIONS+=("$p")
+    done <"$EXCLUSIONS_FILE"
+else
+    log "exclusion list missing: $EXCLUSIONS_FILE"
+fi
+
+want=$(mktemp)
+printf '%s\n' "${EXCLUSIONS[@]}" >"$want"
+while IFS= read -r -d '' p; do
+    printf '%s\n' "$p" >>"$want"
+done < <(/usr/bin/find /Users/vankov/Projects /Users/vankov/Install \
+    "/Users/vankov/Library/Application Support/Cursor/User/globalStorage/anysphere.cursor-agent-worker" \
+    -name node_modules -type d -prune -print0 2>/dev/null)
+sort -u "$want" -o "$want"
+mark_result=$(PATHS_FILE="$want" MARKS_FILE="$MARKS" ATTR="$EXCLUDE_ATTR" /usr/bin/python3 - <<'PY'
+import ctypes, os, plistlib
+libc = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True)
+attr = os.environ["ATTR"].encode()
+value = plistlib.dumps("com.apple.backupd", fmt=plistlib.FMT_BINARY)
+buf = ctypes.create_string_buffer(value)
+marked = []
+failed = 0
+missing = 0
+with open(os.environ["PATHS_FILE"], encoding="utf-8") as handle:
+    paths = [line.rstrip("\n") for line in handle if line.strip()]
+for path in paths:
+    raw = path.encode()
+    if not os.path.lexists(path):
+        missing += 1
+        continue
+    if libc.getxattr(raw, attr, None, 0, 0, 1) >= 0:
+        continue
+    if libc.setxattr(raw, attr, buf, len(value), 0, 1) == 0:
+        marked.append(path)
+    else:
+        failed += 1
+with open(os.environ["MARKS_FILE"], "w", encoding="utf-8") as handle:
+    for path in marked:
+        handle.write(path + "\n")
+print(len(paths), len(marked), failed, missing)
+PY
+)
+rm -f "$want"
+marks_on=1
+log "exclusion marks applied for this run ($mark_result = listed, newly marked, failed, missing)"
+
+log "start backup"
+/usr/bin/tmutil startbackup --auto --block
+status=$?
+log "backup exit $status"
+
+sleep 5
+unmount_tm
+log "done"
+exit "$status"
