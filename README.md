@@ -12,12 +12,12 @@ Automatic Time Machine backups stay off in System Settings. This app is the sche
 
 - macOS. Built and tested on macOS 27.2.1 (build 26B131), Apple Silicon.
 - A Time Machine destination already saved in System Settings. The app reads that list. A destination can be a local disk or a network volume (SMB, AFP, or NFS).
-- An administrator password to install or remove the background job.
+- An administrator password to install or remove the background job, and to run a backup from the app.
 - Swift command-line tools, if you build it yourself. Tested with Swift 6.4.2. Xcode is not required.
 
-## What the window does
+## What the app does
 
-**Start backup** runs one backup immediately. It does not wait for the interval.
+**Start backup** asks for an administrator password, then runs one backup immediately. It does not wait for the interval.
 
 **Edit exclusions** opens the extra exclusion list. Those paths are skipped only by a backup this app starts. Time Machine Settings is a separate list and is not changed. The list is kept in `Resources/exclusions.txt` inside the app, one path per line. A line starting with `#` is ignored. Paths are shown in alphabetical order. The list in this repository is empty.
 
@@ -27,9 +27,9 @@ Automatic Time Machine backups stay off in System Settings. This app is the sche
 
 **Install** adds the background job and runs a backup on the interval above. The button is disabled while the job is installed.
 
-**Uninstall** removes that job and stops the automatic backups. The button is disabled while the job is not installed. See [Uninstall](#uninstall).
+**Uninstall** asks for an administrator password, then removes the background job and stops the automatic backups. The button is disabled while the job is not installed. The app stays in Applications. Backups already stored by Time Machine stay. The exclusion list stays in the app.
 
-Installing or uninstalling asks for an administrator password, because the job is a system launch daemon.
+Installing, uninstalling, and starting a backup ask for an administrator password, because the backup runs as root.
 
 ## What one backup does
 
@@ -51,14 +51,6 @@ cp -R build/TimeMachineBackup.app /Applications/
 ```
 
 Open **Fast Time Machine Backup** from Applications. `./build.sh` writes `build/TimeMachineBackup.app` and does not replace an app that is already in Applications.
-
-## Uninstall
-
-**Uninstall** asks for an administrator password, then removes the background job `local.fasttimemachine.backup` from `/Library/LaunchDaemons`. Automatic backups from this app stop. The app stays in Applications. Backups already stored by Time Machine stay. The exclusion list stays in the app. Time Machine Settings is not changed.
-
-If a backup is running, the app leaves the job in place and asks you to wait until that backup finishes.
-
-To remove the app itself, uninstall the job first, then delete **Fast Time Machine Backup** from Applications. The log file `/var/log/local.fasttimemachine.backup.log` is left behind.
 
 ## License
 
