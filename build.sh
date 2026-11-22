@@ -12,8 +12,8 @@ mkdir -p "$macos" "$resources"
 
 cp "$root/Resources/Info.plist" "$app/Contents/Info.plist"
 cp "$root/Resources/AppIcon.icns" "$resources/AppIcon.icns"
-cp "$root/Sources/TimeMachineBackup" "$macos/TimeMachineBackup"
-chmod 755 "$macos/TimeMachineBackup"
+cp "$root/Sources/TimeMachineBackup" "$resources/backup.sh"
+chmod 755 "$resources/backup.sh"
 
 swiftc -O -framework AppKit \
     -o "$macos/BackupMenu" \
@@ -22,17 +22,25 @@ swiftc -O -framework AppKit \
     "$root/Sources/EditExclusions.swift"
 chmod 755 "$macos/BackupMenu"
 
-codesign -s - --force "$macos/BackupMenu"
-
-# Login Items uses the icon of the executable. A shell script otherwise shows
-# the Terminal icon, so the Time Machine icon is attached to that file.
-# A resource-fork icon cannot be sealed by codesign, so the bundle is left unsigned.
-swift - "$macos/TimeMachineBackup" "$resources/AppIcon.icns" <<'SWIFT'
+clang -O2 -o "$macos/TimeMachineBackup" "$root/Sources/BackupJob.c"
+chmod 755 "$macos/TimeMachineBackup"
+# The Login Items row is named from this program. A resource fork blocks signing
+# and stops macOS from recording that the job is running.
+xattr -cr "$app"
+codesign -s - --force --identifier local.fasttimemachine.backup "$macos/BackupMenu"
+codesign -s - --force --identifier local.fasttimemachine.backup "$app"
+# Login Items shows the icon of this program file. Apply it after signing.
+# Signing rejects the icon's resource fork, and clearing attributes removes the icon.
+APP="$app" swift - <<'SWIFT'
 import AppKit
-let ok = NSWorkspace.shared.setIcon(NSImage(contentsOfFile: CommandLine.arguments[2])!, forFile: CommandLine.arguments[1], options: [])
-if !ok { fputs("Could not set the executable icon\n", stderr); exit(1) }
+let app = ProcessInfo.processInfo.environment["APP"]!
+let icon = NSImage(contentsOfFile: app + "/Contents/Resources/AppIcon.icns")!
+let bin = app + "/Contents/MacOS/TimeMachineBackup"
+if !NSWorkspace.shared.setIcon(icon, forFile: bin, options: []) {
+    fputs("could not set the Time Machine icon\n", stderr)
+    exit(1)
+}
 SWIFT
-codesign --remove-signature "$app" 2>/dev/null || true
 
 echo "Built $app"
 echo "To install:  cp -R \"$app\" /Applications/"

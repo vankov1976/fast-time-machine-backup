@@ -203,7 +203,7 @@ restore() {
 }
 
 if [ "$(id -u)" -ne 0 ]; then
-    exec "$(cd "$(dirname "$0")" && pwd)/BackupMenu"
+    exec "$(cd "$(dirname "$0")/../MacOS" && pwd)/BackupMenu"
 fi
 
 if ! mkdir "$LOCKDIR" 2>/dev/null; then

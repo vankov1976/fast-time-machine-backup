@@ -141,8 +141,18 @@ final class Menu: NSObject, NSApplicationDelegate {
         var interval = 3600
         if installed, let data = FileManager.default.contents(atPath: plistPath),
            let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] {
-            runAtLoad = (plist["RunAtLoad"] as? Bool) ?? false
-            interval = (plist["StartInterval"] as? Int) ?? 3600
+            if let args = plist["ProgramArguments"] as? [String] {
+                for arg in args.dropFirst() {
+                    if arg == "backup" {
+                        runAtLoad = true
+                    } else if let n = Int(arg), n >= 60 {
+                        interval = n
+                    }
+                }
+            } else {
+                runAtLoad = (plist["RunAtLoad"] as? Bool) ?? false
+                interval = (plist["StartInterval"] as? Int) ?? 3600
+            }
         }
         jobInstalled = installed
         destinationConfigured = Self.timeMachineDestinationConfigured()
@@ -212,6 +222,7 @@ final class Menu: NSObject, NSApplicationDelegate {
         	<key>ProgramArguments</key>
         	<array>
         		<string>\(program)</string>
+        		<string>once</string>
         	</array>
         	<key>RunAtLoad</key>
         	<true/>
@@ -312,12 +323,9 @@ final class Menu: NSObject, NSApplicationDelegate {
         let seconds = period.selectedItem?.representedObject as? Int ?? 3600
         let runAtLoad = startAtLogin.state == .on
         let finalPlist = plistXML(runAtLoad: runAtLoad, seconds: seconds)
-        let loadPlist = plistXML(runAtLoad: false, seconds: seconds)
         let finalURL = FileManager.default.temporaryDirectory.appendingPathComponent("tmbackup-final.plist")
-        let loadURL = FileManager.default.temporaryDirectory.appendingPathComponent("tmbackup-load.plist")
         do {
             try finalPlist.write(to: finalURL, atomically: true, encoding: .utf8)
-            try loadPlist.write(to: loadURL, atomically: true, encoding: .utf8)
         } catch {
             alert("Could not prepare the job.", error.localizedDescription)
             return
@@ -329,11 +337,7 @@ final class Menu: NSObject, NSApplicationDelegate {
         chmod 644 "\(plistPath)"
         launchctl enable system/\(label) || true
         launchctl bootout system/\(label) || true
-        cp "\(loadURL.path)" "\(plistPath)"
         launchctl bootstrap system "\(plistPath)"
-        cp "\(finalURL.path)" "\(plistPath)"
-        chown root:wheel "\(plistPath)"
-        chmod 644 "\(plistPath)"
         """
         let scriptURL = FileManager.default.temporaryDirectory.appendingPathComponent("tmbackup-install.sh")
         do {
@@ -356,7 +360,7 @@ final class Menu: NSObject, NSApplicationDelegate {
     }
 
     func plistXML(runAtLoad: Bool, seconds: Int) -> String {
-        let flag = runAtLoad ? "<true/>" : "<false/>"
+        let backupArg = runAtLoad ? "\n\t\t<string>backup</string>" : ""
         return """
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -371,16 +375,17 @@ final class Menu: NSObject, NSApplicationDelegate {
         	<key>ProgramArguments</key>
         	<array>
         		<string>\(program)</string>
+        		<string>\(seconds)</string>\(backupArg)
         	</array>
         	<key>EnvironmentVariables</key>
         	<dict>
         		<key>PATH</key>
         		<string>/usr/bin:/bin:/usr/sbin:/sbin</string>
         	</dict>
-        	<key>StartInterval</key>
-        	<integer>\(seconds)</integer>
+        	<key>KeepAlive</key>
+        	<true/>
         	<key>RunAtLoad</key>
-        	\(flag)
+        	<true/>
         </dict>
         </plist>
         """
@@ -403,12 +408,7 @@ final class Menu: NSObject, NSApplicationDelegate {
         if FileManager.default.fileExists(atPath: "/var/run/local.fasttimemachine.backup.lock") {
             return true
         }
-        for name in [label, "local.fasttimemachine.backup.manual"] {
-            if launchctl(["print", "system/\(name)"]).output.contains("state = running") {
-                return true
-            }
-        }
-        return false
+        return launchctl(["print", "system/local.fasttimemachine.backup.manual"]).output.contains("state = running")
     }
 
     func launchctl(_ args: [String]) -> (status: Int, output: String) {
