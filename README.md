@@ -45,16 +45,24 @@ A second run does not start while one is already going. The log is `/var/log/loc
 
 ## Build and install
 
-Download [TimeMachineBackup.app.zip](https://github.com/vankov1976/fast-time-machine-backup/releases/latest/download/TimeMachineBackup.app.zip) from the [releases page](https://github.com/vankov1976/fast-time-machine-backup/releases). Unzip it and move **TimeMachineBackup.app** to Applications. Open **Fast Time Machine Backup**. The exclusion list in that download has no paths. If an app is already installed, copying a new one over it replaces `Resources/exclusions.txt`. Put the existing list back if those paths should stay.
+Two ways to get the app. Both end with **TimeMachineBackup.app** in Applications. Open **Fast Time Machine Backup** from there.
 
-To build it yourself:
+The exclusion list in a fresh app has no paths. If an app is already installed, copying a new one over it replaces `Resources/exclusions.txt`. Put the existing list back if those paths should stay.
+
+### Download the release
+
+Download [TimeMachineBackup.app.zip](https://github.com/vankov1976/fast-time-machine-backup/releases/latest/download/TimeMachineBackup.app.zip) from the [releases page](https://github.com/vankov1976/fast-time-machine-backup/releases). Unzip it and move **TimeMachineBackup.app** to Applications.
+
+### Build it yourself
+
+Swift command-line tools are required. Xcode is not.
 
 ```bash
 ./build.sh
 cp -R build/TimeMachineBackup.app /Applications/
 ```
 
-`./build.sh` writes `build/TimeMachineBackup.app` and does not replace an app that is already in Applications.
+`./build.sh` writes `build/TimeMachineBackup.app` and does not replace an app that is already in Applications. The `cp` line is the install.
 
 ## Uninstall
 
