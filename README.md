@@ -52,6 +52,17 @@ cp -R build/TimeMachineBackup.app /Applications/
 
 Open **Fast Time Machine Backup** from Applications. `./build.sh` writes `build/TimeMachineBackup.app` and does not replace an app that is already in Applications.
 
+## Uninstall
+
+To remove the app itself:
+
+1. Open **Fast Time Machine Backup**.
+2. Click **Uninstall** and enter an administrator password. This removes the background job. If a backup is already running, wait until it finishes, then click **Uninstall** again.
+3. Quit the app.
+4. Delete **Fast Time Machine Backup** from Applications.
+
+Backups already stored by Time Machine stay. Time Machine Settings is not changed. The log file `/var/log/local.fasttimemachine.backup.log` is left on the Mac.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
