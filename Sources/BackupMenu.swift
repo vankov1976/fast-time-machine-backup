@@ -205,6 +205,10 @@ final class Menu: NSObject, NSApplicationDelegate {
         <dict>
         	<key>Label</key>
         	<string>\(manualLabel)</string>
+        	<key>AssociatedBundleIdentifiers</key>
+        	<array>
+        		<string>\(label)</string>
+        	</array>
         	<key>ProgramArguments</key>
         	<array>
         		<string>\(program)</string>
@@ -360,6 +364,10 @@ final class Menu: NSObject, NSApplicationDelegate {
         <dict>
         	<key>Label</key>
         	<string>\(label)</string>
+        	<key>AssociatedBundleIdentifiers</key>
+        	<array>
+        		<string>\(label)</string>
+        	</array>
         	<key>ProgramArguments</key>
         	<array>
         		<string>\(program)</string>

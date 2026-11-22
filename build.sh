@@ -24,7 +24,16 @@ swiftc -O -framework AppKit \
 chmod 755 "$macos/BackupMenu"
 
 codesign -s - --force "$macos/BackupMenu"
-codesign -s - --force "$app"
+
+# Login Items uses the icon of the executable. A shell script otherwise shows
+# the Terminal icon, so the Time Machine icon is attached to that file.
+# A resource-fork icon cannot be sealed by codesign, so the bundle is left unsigned.
+swift - "$macos/TimeMachineBackup" "$resources/AppIcon.icns" <<'SWIFT'
+import AppKit
+let ok = NSWorkspace.shared.setIcon(NSImage(contentsOfFile: CommandLine.arguments[2])!, forFile: CommandLine.arguments[1], options: [])
+if !ok { fputs("Could not set the executable icon\n", stderr); exit(1) }
+SWIFT
+codesign --remove-signature "$app" 2>/dev/null || true
 
 echo "Built $app"
 echo "To install:  cp -R \"$app\" /Applications/"
