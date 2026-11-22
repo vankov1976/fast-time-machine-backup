@@ -442,12 +442,35 @@ final class Menu: NSObject, NSApplicationDelegate {
 
 var retainedMenu: Menu?
 
+func exclusionsFileURL() -> URL {
+    let manager = FileManager.default
+    let directory = manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("local.fasttimemachine.backup", isDirectory: true)
+    try? manager.createDirectory(at: directory, withIntermediateDirectories: true)
+    let stored = directory.appendingPathComponent("exclusions.txt")
+    if !manager.fileExists(atPath: stored.path),
+       let bundled = Bundle.main.url(forResource: "exclusions", withExtension: "txt"),
+       manager.fileExists(atPath: bundled.path) {
+        try? manager.copyItem(at: bundled, to: stored)
+    }
+    if !manager.fileExists(atPath: stored.path) {
+        let header = """
+        # Extra exclusions for the root backup. One path per line.
+        # Lines starting with # are ignored.
+        # Time Machine Settings is a separate list and is not changed here.
+
+        """
+        try? header.write(to: stored, atomically: true, encoding: .utf8)
+    }
+    return stored
+}
+
 func launchMenu() {
     let bundle = Bundle.main
     let macos = (bundle.executableURL ?? URL(fileURLWithPath: CommandLine.arguments[0])).deletingLastPathComponent()
     let program = macos.appendingPathComponent("TimeMachineBackup").path
     let editor = macos.appendingPathComponent("EditExclusions").path
-    let exclusions = (bundle.resourceURL ?? macos.deletingLastPathComponent().appendingPathComponent("Resources")).appendingPathComponent("exclusions.txt").path
+    let exclusions = exclusionsFileURL().path
 
     let app = NSApplication.shared
     let menu = Menu(program: program, editor: editor, exclusions: exclusions)

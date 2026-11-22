@@ -19,7 +19,7 @@ Automatic Time Machine backups stay off in System Settings. This app is the sche
 
 **Start backup** asks for an administrator password, then runs one backup immediately. It does not wait for the interval. If Time Machine has no destination, the window says **No Time Machine destination configured. Set a destination in Time Machine Settings.** **Start backup**, **Run a backup when the Mac starts**, and **Install** stay locked until a destination exists. **Uninstall** stays available when a background job is already installed.
 
-**Edit exclusions** opens the extra exclusion list. Those paths are skipped only by a backup this app starts. Time Machine Settings is a separate list and is not changed. The list is kept in `Resources/exclusions.txt` inside the app, one path per line. A line starting with `#` is ignored. Paths are shown in alphabetical order. The list in this repository is empty.
+**Edit exclusions** opens the extra exclusion list. Those paths are skipped only by a backup this app starts. Time Machine Settings is a separate list and is not changed. The list is kept outside the app, in `~/Library/Application Support/local.fasttimemachine.backup/exclusions.txt`, so replacing the app leaves it in place. If that file is missing, opening the app creates it. One path per line. A line starting with `#` is ignored. Paths are shown in alphabetical order.
 
 **Background job interval** applies only to the installed background job. The choices run from 15 minutes to 24 hours.
 
@@ -39,15 +39,13 @@ Transfer optimizations are used only for a remote destination, and only while th
 
 Before a remote copy, the app waits until that volume's host answers a ping or a connection on its protocol port (445 for SMB, 548 for AFP, 2049 for NFS). The host comes from the destination URL. If that host stays unreachable, that destination is skipped and any other destination still runs.
 
-The exclusion marks cover only the paths in `Resources/exclusions.txt`.
+The exclusion marks cover only the paths in `~/Library/Application Support/local.fasttimemachine.backup/exclusions.txt`.
 
 A second run does not start while one is already going. The log is `/var/log/local.fasttimemachine.backup.log`.
 
 ## Build and install
 
-Two ways to get the app. Both end with **TimeMachineBackup.app** in Applications. Open **Fast Time Machine Backup** from there.
-
-The exclusion list in a fresh app has no paths. If an app is already installed, copying a new one over it replaces `Resources/exclusions.txt`. Put the existing list back if those paths should stay.
+Two ways to get the app. Both end with **TimeMachineBackup.app** in Applications. Open **Fast Time Machine Backup** from there. Replacing the app does not change the exclusion list.
 
 ### Download the release
 

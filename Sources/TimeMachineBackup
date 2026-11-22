@@ -7,7 +7,35 @@ LOCKDIR=/var/run/local.fasttimemachine.backup.lock
 LOG=/var/log/local.fasttimemachine.backup.log
 NSMB=/etc/nsmb.conf
 NSMB_BAK=/etc/nsmb.conf.tmbackup-saved
-EXCLUSIONS_FILE="$(cd "$(dirname "$0")/.." && pwd)/Resources/exclusions.txt"
+exclusions_file() {
+    local console home bundled
+    console=$(/usr/bin/stat -f '%Su' /dev/console 2>/dev/null || true)
+    if [ -z "$console" ] || [ "$console" = "root" ] || [ "$console" = "loginwindow" ]; then
+        console=$(/usr/bin/defaults read /Library/Preferences/com.apple.loginwindow lastUserName 2>/dev/null || true)
+    fi
+    home=""
+    if [ -n "$console" ]; then
+        home=$(/usr/bin/dscl . -read "/Users/${console}" NFSHomeDirectory 2>/dev/null | /usr/bin/awk '{print $2}')
+        if [ -z "$home" ]; then
+            home="/Users/${console}"
+        fi
+    fi
+    bundled="$(cd "$(dirname "$0")/.." && pwd)/Resources/exclusions.txt"
+    if [ -n "$home" ] && [ -f "$home/Library/Application Support/local.fasttimemachine.backup/exclusions.txt" ]; then
+        printf '%s\n' "$home/Library/Application Support/local.fasttimemachine.backup/exclusions.txt"
+        return
+    fi
+    if [ -f "$bundled" ]; then
+        printf '%s\n' "$bundled"
+        return
+    fi
+    if [ -n "$home" ]; then
+        printf '%s\n' "$home/Library/Application Support/local.fasttimemachine.backup/exclusions.txt"
+    else
+        printf '%s\n' "$bundled"
+    fi
+}
+EXCLUSIONS_FILE="$(exclusions_file)"
 MARKS=/var/run/local.fasttimemachine.backup.marks
 EXCLUDE_ATTR='com.apple.metadata:com_apple_backup_excludeItem'
 marks_on=0

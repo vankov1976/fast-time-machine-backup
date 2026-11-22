@@ -12,7 +12,6 @@ mkdir -p "$macos" "$resources"
 
 cp "$root/Resources/Info.plist" "$app/Contents/Info.plist"
 cp "$root/Resources/AppIcon.icns" "$resources/AppIcon.icns"
-cp "$root/Resources/exclusions.txt" "$resources/exclusions.txt"
 cp "$root/Sources/TimeMachineBackup" "$macos/TimeMachineBackup"
 chmod 755 "$macos/TimeMachineBackup"
 

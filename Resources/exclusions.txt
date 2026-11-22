@@ -1,3 +1,0 @@
-# Extra exclusions for the root backup. One path per line.
-# Lines starting with # are ignored.
-# Time Machine Settings is a separate list and is not changed here.
