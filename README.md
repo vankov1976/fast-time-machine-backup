@@ -1,55 +1,64 @@
 # Fast Time Machine Backup
 
-A small macOS app that runs Time Machine on a schedule, and speeds the copy up while that one backup is running.
+A small macOS app that runs Time Machine on a schedule. It backs up every destination already set in Time Machine, and it can skip extra folders that System Settings will not add.
 
-It is built for a backup stored on a Synology NAS (a DS220+) over SMB. Automatic Time Machine backups stay off in System Settings. This app is the scheduler.
+Automatic Time Machine backups stay off in System Settings. This app is the scheduler.
 
-![Extra exclusions](docs/screenshot.png)
+![Main window](docs/main-window.png)
+
+![Extra exclusions](docs/exclusions.png)
+
+## Requirements
+
+- macOS. Built and tested on macOS 27.2.1 (build 26B131), Apple Silicon.
+- A Time Machine destination already saved in System Settings. The app reads that list. A destination can be a local disk or a network volume (SMB, AFP, or NFS).
+- An administrator password to install or remove the background job.
+- Swift command-line tools, if you build it yourself. Tested with Swift 6.4.2. Xcode is not required.
 
 ## What the window does
 
 **Start backup** runs one backup immediately. It does not wait for the interval.
 
-**Edit exclusions** opens the extra exclusion list. Those paths are skipped only by a backup this app starts. Time Machine Settings is a separate list and is not changed. The list is kept in `Resources/exclusions.txt`, one path per line. A line starting with `#` is ignored. Paths are shown in alphabetical order.
+**Edit exclusions** opens the extra exclusion list. Those paths are skipped only by a backup this app starts. Time Machine Settings is a separate list and is not changed. The list is kept in `Resources/exclusions.txt` inside the app, one path per line. A line starting with `#` is ignored. Paths are shown in alphabetical order. The list in this repository is empty.
 
 **Background job interval** applies only to the installed background job. The choices run from 15 minutes to 24 hours.
 
-**Run a backup when the Mac starts** is available only while the background job is installed. It runs one backup at login. It does not change the macOS setting for app background activity.
+**Run a backup when the Mac starts** is available only while the background job is installed. It runs one backup at startup. It does not change the macOS setting for app background activity.
 
-**Install** adds the background job and starts it on the interval above. **Uninstall** removes that job. Install is disabled while the job is installed. Uninstall is disabled while it is not.
+**Install** adds the background job and runs a backup on the interval above. The button is disabled while the job is installed.
+
+**Uninstall** removes that job and stops the automatic backups. The button is disabled while the job is not installed. See [Uninstall](#uninstall).
 
 Installing or uninstalling asks for an administrator password, because the job is a system launch daemon.
 
 ## What one backup does
 
-The backup runs as root. While it runs, and only while it runs, the app:
+The backup runs as root. It reads the destinations with `tmutil destinationinfo` and backs up each one. Extra exclusions are marked for every destination, then removed when the run exits.
 
-1. Waits until the NAS answers. It pings `DS220plus`, then `10.0.0.5`. If neither answers, the run is skipped.
-2. Turns the AirDrop radio (`awdl0`) off, so Wi-Fi is not shared with AirDrop during the copy.
-3. Turns off the low-priority disk throttle (`debug.lowpri_throttle_enabled`), so Time Machine is not held back.
-4. Writes `/etc/nsmb.conf` with SMB signing off, change notifications off, and SMB3 only. An existing Time Machine volume is unmounted first, because a connection that is already open keeps the old settings.
-5. Marks the extra exclusion paths on the folders themselves, with the Time Machine exclusion attribute. It also marks every `node_modules` folder under `/Users/vankov/Projects`, `/Users/vankov/Install`, and the Cursor agent worker storage. The marks are removed when the backup exits, including when it fails.
-6. Runs `tmutil startbackup --auto --block`.
-7. Unmounts the Time Machine volume again, and puts the network, the throttle, and the SMB config back the way they were.
+Transfer optimizations are used only for a remote destination, and only while that destination is being copied. A local disk does not get them. For a remote volume the app turns the AirDrop radio off and turns the low-priority disk throttle off. For an SMB volume it also writes `/etc/nsmb.conf` with signing off, change notifications off, and SMB3 only, then unmounts an open Time Machine network volume so the new connection uses those settings. An AFP or NFS volume does not get the SMB file. When the remote copy finishes, the radio, the throttle, and the SMB file are put back.
 
-A second run does not start while one is already going. The log is `/var/log/com.vankov.tmbackup.log`.
+Before a remote copy, the app waits until that volume's host answers a ping or a connection on its protocol port (445 for SMB, 548 for AFP, 2049 for NFS). The host comes from the destination URL. If that host stays unreachable, that destination is skipped and any other destination still runs.
 
-## Change it for another Mac
+The exclusion marks cover only the paths in `Resources/exclusions.txt`.
 
-In `Sources/TimeMachineBackup`, change the NAS name and address in the ping loop, and change the three folders searched for `node_modules`.
-
-Edit `Resources/exclusions.txt` for the extra paths, or use **Edit exclusions** in the app after it is installed.
+A second run does not start while one is already going. The log is `/var/log/local.fasttimemachine.backup.log`.
 
 ## Build and install
-
-Xcode is not required. The Swift command-line tools are.
 
 ```bash
 ./build.sh
 cp -R build/TimeMachineBackup.app /Applications/
 ```
 
-Open **Fast Time Machine Backup** from Applications. The copy already in `/Applications` on this Mac is the installed app. Rebuilding here does not replace it until that `cp` is run.
+Open **Fast Time Machine Backup** from Applications. `./build.sh` writes `build/TimeMachineBackup.app` and does not replace an app that is already in Applications.
+
+## Uninstall
+
+**Uninstall** asks for an administrator password, then removes the background job `local.fasttimemachine.backup` from `/Library/LaunchDaemons`. Automatic backups from this app stop. The app stays in Applications. Backups already stored by Time Machine stay. The exclusion list stays in the app. Time Machine Settings is not changed.
+
+If a backup is running, the app leaves the job in place and asks you to wait until that backup finishes.
+
+To remove the app itself, uninstall the job first, then delete **Fast Time Machine Backup** from Applications. The log file `/var/log/local.fasttimemachine.backup.log` is left behind.
 
 ## License
 

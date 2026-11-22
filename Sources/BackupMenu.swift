@@ -1,6 +1,6 @@
 import AppKit
 
-let label = "com.vankov.tmbackup"
+let label = "local.fasttimemachine.backup"
 let plistPath = "/Library/LaunchDaemons/\(label).plist"
 let choices: [(String, Int)] = [
     ("15 minutes", 900),
@@ -164,7 +164,7 @@ final class Menu: NSObject, NSApplicationDelegate {
     }
 
     @objc func startBackup() {
-        let manualLabel = "com.vankov.tmbackup.manual"
+        let manualLabel = "local.fasttimemachine.backup.manual"
         let manualPlist = "/Library/LaunchDaemons/\(manualLabel).plist"
         let plist = """
         <?xml version="1.0" encoding="UTF-8"?>

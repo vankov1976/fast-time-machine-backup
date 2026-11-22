@@ -7,7 +7,7 @@
     <key>CFBundleName</key>
     <string>TimeMachineBackup</string>
     <key>CFBundleIdentifier</key>
-    <string>com.vankov.tmbackup</string>
+    <string>local.fasttimemachine.backup</string>
     <key>CFBundleExecutable</key>
     <string>TimeMachineBackup</string>
     <key>CFBundleIconFile</key>

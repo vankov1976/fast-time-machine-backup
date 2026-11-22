@@ -1,22 +1,3 @@
 # Extra exclusions for the root backup. One path per line.
 # Lines starting with # are ignored.
 # Time Machine Settings is a separate list and is not changed here.
-/Users/vankov/.cursor/extensions
-/Users/vankov/.cursor/projects
-/Users/vankov/.npm
-/Users/vankov/Library/Application Support/Claude/Cache
-/Users/vankov/Library/Application Support/Claude/Code Cache
-/Users/vankov/Library/Application Support/Claude/DawnGraphiteCache
-/Users/vankov/Library/Application Support/Claude/DawnWebGPUCache
-/Users/vankov/Library/Application Support/Claude/GPUCache
-/Users/vankov/Library/Application Support/Claude/GraphiteDawnCache
-/Users/vankov/Library/Application Support/Cursor/Cache
-/Users/vankov/Library/Application Support/Cursor/CachedData
-/Users/vankov/Library/Application Support/Cursor/CachedExtensionVSIXs
-/Users/vankov/Library/Application Support/Cursor/CachedProfilesData
-/Users/vankov/Library/Application Support/Cursor/Code Cache
-/Users/vankov/Library/Application Support/Cursor/DawnGraphiteCache
-/Users/vankov/Library/Application Support/Cursor/DawnWebGPUCache
-/Users/vankov/Library/Application Support/Cursor/GPUCache
-/Users/vankov/Library/Application Support/Cursor/logs
-/Users/vankov/Library/Application Support/Cursor/Service Worker
