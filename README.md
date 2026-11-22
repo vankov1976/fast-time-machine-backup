@@ -17,7 +17,7 @@ Automatic Time Machine backups stay off in System Settings. This app is the sche
 
 ## What the app does
 
-**Start backup** asks for an administrator password, then runs one backup immediately. It does not wait for the interval.
+**Start backup** asks for an administrator password, then runs one backup immediately. It does not wait for the interval. If Time Machine has no destination, the window says **No Time Machine destination configured. Set a destination in Time Machine Settings.** **Start backup**, **Run a backup when the Mac starts**, and **Install** stay locked until a destination exists. **Uninstall** stays available when a background job is already installed.
 
 **Edit exclusions** opens the extra exclusion list. Those paths are skipped only by a backup this app starts. Time Machine Settings is a separate list and is not changed. The list is kept in `Resources/exclusions.txt` inside the app, one path per line. A line starting with `#` is ignored. Paths are shown in alphabetical order. The list in this repository is empty.
 
@@ -57,7 +57,7 @@ Open **Fast Time Machine Backup** from Applications. `./build.sh` writes `build/
 To remove the app itself:
 
 1. Open **Fast Time Machine Backup**.
-2. Click **Uninstall** and enter an administrator password. This removes the background job. If a backup is already running, wait until it finishes, then click **Uninstall** again.
+2. Click **Uninstall** and enter an administrator password. This removes the background job. If a backup is already running, the app says to wait and leaves the job in place. When the backup finishes, click **Uninstall** again.
 3. Quit the app.
 4. Delete **Fast Time Machine Backup** from Applications.
 
