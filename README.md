@@ -47,8 +47,6 @@ A second run does not start while one is already going. The log is `/var/log/loc
 
 Two ways to get the app. Both end with **TimeMachineBackup.app** in Applications. Open **Fast Time Machine Backup** from there.
 
-The exclusion list in a fresh app has no paths. If an app is already installed, copying a new one over it replaces `Resources/exclusions.txt`. Put the existing list back if those paths should stay.
-
 ### Download the release
 
 Download [TimeMachineBackup.app.zip](https://github.com/vankov1976/fast-time-machine-backup/releases/latest/download/TimeMachineBackup.app.zip) from the [releases page](https://github.com/vankov1976/fast-time-machine-backup/releases). Unzip it and move **TimeMachineBackup.app** to Applications.
